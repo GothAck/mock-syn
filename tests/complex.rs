@@ -14,7 +14,7 @@ mock_syn! {
 mock_syn! {
     #[mock_syn(no_parse)]
     pub struct DataEnum as DDataEnum {
-        #[mock_syn(iter)]
+        #[mock_syn(transform(iter))]
         pub variants: Vec<DVariant>,
     }
 }
@@ -47,14 +47,14 @@ mock_syn! {
 
 mock_syn! {
     pub struct FieldsNamed as DFieldsNamed {
-        #[mock_syn(iter)]
+        #[mock_syn(transform(iter))]
         pub named: Vec<DFieldNamed>,
     }
 }
 
 mock_syn! {
     pub struct FieldsUnnamed as DFieldsUnnamed {
-        #[mock_syn(iter(v -> v indexed))]
+        #[mock_syn(transform(iter(v -> v indexed)))]
         pub unnamed: Vec<DFieldUnnamed>,
     }
 }
@@ -62,7 +62,7 @@ mock_syn! {
 mock_syn! {
     #[mock_syn(no_parse)]
     pub struct Field as DFieldNamed {
-        #[mock_syn(try_from(value.clone().ok_or_else(|| syn::Error::new_spanned(&__wrapped, "Fields should be named"))?))]
+        #[mock_syn(transform(value_map(value.clone().ok_or_else(|| syn::Error::new_spanned(&__wrapped, "Fields should be named"))?)))]
         pub ident: Ident,
     }
 }
@@ -72,7 +72,7 @@ mock_syn! {
     pub struct Field as DFieldUnnamed {
         #[mock_syn(skip(Index { index: index as u32, span: __wrapped.ty.span() }))]
         pub index: Index,
-        #[mock_syn(try_from(if value.is_some() { return Err(syn::Error::new_spanned(&__wrapped, "Fields should not be named")) } else { NoIdent } ))]
+        #[mock_syn(transform(value_map(if value.is_some() { return Err(syn::Error::new_spanned(&__wrapped, "Fields should not be named")) } else { NoIdent } )))]
         pub ident: NoIdent,
     }
 }

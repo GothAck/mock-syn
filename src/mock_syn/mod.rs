@@ -226,6 +226,12 @@ impl MockSynDerive {
                 .map(|v| v.to_tokens_match_try_from(ident, as_ident))
                 .collect::<Result<TokenStream>>()?;
 
+            let enum_todo = self.attr.enum_todo.as_ref().map(|_| {
+                quote! {
+                    _ => todo!(),
+                }
+            });
+
             // let fields_def = fields_named
             //     .iter()
             //     .map(MockSynDeriveFieldNamed::to_tokens_value)
@@ -243,6 +249,7 @@ impl MockSynDerive {
                     fn try_from(#try_from_pat: #try_from_ty) -> syn::Result<Self> {
                         Ok(match value {
                             #variant_matches
+                            #enum_todo
                         })
                     }
                 }
@@ -415,31 +422,26 @@ impl MockSynDeriveFieldNamed {
         }
     }
     fn to_tokens_from(&self) -> Result<TokenStream> {
-        if let Some(try_from) = &self.attr.try_from {
-            Ok(quote! { #try_from })
-        } else if let Some(iter) = &self.attr.iter {
-            Ok(match iter {
-                MockSynDeriveFieldAttrIter::ValueToValue => {
-                    quote! {
-                        value.into_iter()
-                            .map(TryFrom::try_from)
-                            .collect::<Result<_>>()?
-                    }
-                }
-                MockSynDeriveFieldAttrIter::ValueToValueIndexed => {
-                    quote! {
-                        value.into_iter()
-                            .enumerate()
-                            .map(TryFrom::try_from)
-                            .collect::<Result<_>>()?
-                    }
-                }
-            })
-        } else {
-            Ok(quote! {
-                TryFrom::try_from(value)?
-            })
-        }
+        Ok(match &self.attr.transform {
+            None => quote! { TryFrom::try_from(value)? },
+            Some(MockSynDeriveFieldAttrTransform::Clone) => quote! { value.clone() },
+            Some(MockSynDeriveFieldAttrTransform::ValueMap(value_map)) => quote! { #value_map },
+            Some(MockSynDeriveFieldAttrTransform::Iter(
+                MockSynDeriveFieldAttrIter::ValueToValue,
+            )) => quote! {
+                value.into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_>>()?
+            },
+            Some(MockSynDeriveFieldAttrTransform::Iter(
+                MockSynDeriveFieldAttrIter::ValueToValueIndexed,
+            )) => quote! {
+                value.into_iter()
+                    .enumerate()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_>>()?
+            },
+        })
     }
 }
 
@@ -532,19 +534,26 @@ impl MockSynDeriveFieldUnnamed {
         }
     }
     fn to_tokens_from(&self) -> Result<TokenStream> {
-        if let Some(try_from) = &self.attr.try_from {
-            Ok(quote! { #try_from })
-        } else if self.attr.iter.is_some() {
-            Ok(quote! {
+        Ok(match &self.attr.transform {
+            None => quote! { TryFrom::try_from(value)? },
+            Some(MockSynDeriveFieldAttrTransform::Clone) => quote! { value.clone() },
+            Some(MockSynDeriveFieldAttrTransform::ValueMap(value_map)) => quote! { #value_map },
+            Some(MockSynDeriveFieldAttrTransform::Iter(
+                MockSynDeriveFieldAttrIter::ValueToValue,
+            )) => quote! {
                 value.into_iter()
                     .map(TryFrom::try_from)
                     .collect::<Result<_>>()?
-            })
-        } else {
-            Ok(quote! {
-                TryFrom::try_from(value)?
-            })
-        }
+            },
+            Some(MockSynDeriveFieldAttrTransform::Iter(
+                MockSynDeriveFieldAttrIter::ValueToValueIndexed,
+            )) => quote! {
+                value.into_iter()
+                    .enumerate()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_>>()?
+            },
+        })
     }
 }
 
@@ -797,6 +806,7 @@ struct MockSynDeriveAttr {
     try_from: Option<MockSynDeriveAttrTryFrom>,
     no_deref: Option<Nothing>,
     no_parse: Option<Nothing>,
+    enum_todo: Option<Nothing>,
 }
 
 impl fmt::Debug for MockSynDeriveAttr {
@@ -805,6 +815,7 @@ impl fmt::Debug for MockSynDeriveAttr {
             .field("try_from", &self.try_from)
             .field("no_deref", &self.no_deref.is_some())
             .field("no_parse", &self.no_parse.is_some())
+            .field("enum_todo", &self.enum_todo.is_some())
             .finish()
     }
 }
@@ -827,6 +838,9 @@ impl MockSynDeriveAttr {
             }
             if let Some(no_parse) = attr.no_parse {
                 merged.no_parse.replace(no_parse);
+            }
+            if let Some(enum_todo) = attr.enum_todo {
+                merged.enum_todo.replace(enum_todo);
             }
         }
 
@@ -868,6 +882,9 @@ impl Parse for MockSynDeriveAttr {
                 }
                 "no_parse" => {
                     ret.no_parse = Some(input.parse()?);
+                }
+                "enum_todo" => {
+                    ret.enum_todo = Some(input.parse()?);
                 }
                 unknown => {
                     return Err(Error::new_spanned(
@@ -947,8 +964,7 @@ impl Parse for MockSynDeriveAttrTryFrom {
 
 #[derive(Default)]
 struct MockSynDeriveFieldAttr {
-    try_from: Option<Expr>,
-    iter: Option<MockSynDeriveFieldAttrIter>,
+    transform: Option<MockSynDeriveFieldAttrTransform>,
     skip: Option<Option<Option<Expr>>>,
     source: Option<Ident>,
 }
@@ -956,16 +972,7 @@ struct MockSynDeriveFieldAttr {
 impl fmt::Debug for MockSynDeriveFieldAttr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MockSynDeriveFieldAttr")
-            .field(
-                "try_from",
-                &self
-                    .try_from
-                    .as_ref()
-                    .map(ToTokens::into_token_stream)
-                    .as_ref()
-                    .map(ToString::to_string),
-            )
-            .field("iter", &self.iter.is_some())
+            .field("transform", &self.transform)
             .field(
                 "skip",
                 &self.skip.as_ref().map(|o| {
@@ -990,11 +997,8 @@ impl MockSynDeriveFieldAttr {
         let mut merged = iter.next().unwrap_or_default();
 
         for attr in iter {
-            if let Some(try_from) = attr.try_from {
-                merged.try_from.replace(try_from);
-            }
-            if let Some(iter) = attr.iter {
-                merged.iter.replace(iter);
+            if let Some(transform) = attr.transform {
+                merged.transform.replace(transform);
             }
             if let Some(skip) = attr.skip {
                 merged.skip.replace(skip);
@@ -1026,26 +1030,18 @@ impl TryFrom<Attribute> for MockSynDeriveFieldAttr {
 
 impl Parse for MockSynDeriveFieldAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut try_from = None;
-        let mut iter = None;
+        let mut transform = None;
+        // let mut iter = None;
         let mut skip = None;
         let mut source = None;
 
         while !input.is_empty() {
             let ident: Ident = input.parse()?;
             match ident.to_string().as_str() {
-                "try_from" => {
+                "transform" => {
                     let content;
                     let _ = parenthesized!(content in input);
-                    try_from = Some(content.parse()?);
-                }
-                "iter" => {
-                    iter = Some(MockSynDeriveFieldAttrIter::ValueToValue);
-                    if input.peek(token::Paren) {
-                        let content;
-                        let _ = parenthesized!(content in input);
-                        iter = Some(content.parse()?);
-                    }
+                    transform = Some(content.parse()?);
                 }
                 "skip" => {
                     skip = Some(None);
@@ -1077,10 +1073,58 @@ impl Parse for MockSynDeriveFieldAttr {
         }
 
         Ok(Self {
-            try_from,
-            iter,
+            transform,
+            // iter,
             skip,
             source,
+        })
+    }
+}
+
+enum MockSynDeriveFieldAttrTransform {
+    Clone,
+    ValueMap(Box<Expr>),
+    Iter(MockSynDeriveFieldAttrIter),
+}
+
+impl fmt::Debug for MockSynDeriveFieldAttrTransform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Clone => f.write_str("Clone"),
+            Self::ValueMap(expr) => f
+                .debug_tuple("ValueMap")
+                .field(&expr.to_token_stream().to_string())
+                .finish(),
+            Self::Iter(iter) => f.debug_tuple("Iter").field(iter).finish(),
+        }
+    }
+}
+
+impl Parse for MockSynDeriveFieldAttrTransform {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let ident: Ident = input.parse()?;
+        Ok(match ident.to_string().as_str() {
+            "clone" => Self::Clone,
+            "value_map" => {
+                let content;
+                let _ = parenthesized!(content in input);
+                Self::ValueMap(content.parse()?)
+            }
+            "iter" => {
+                if input.peek(token::Paren) {
+                    let content;
+                    let _ = parenthesized!(content in input);
+                    Self::Iter(content.parse()?)
+                } else {
+                    Self::Iter(MockSynDeriveFieldAttrIter::ValueToValue)
+                }
+            }
+            unknown => {
+                return Err(Error::new_spanned(
+                    ident,
+                    format!("Unknown attribute '{}'", unknown),
+                ))
+            }
         })
     }
 }
@@ -1088,6 +1132,15 @@ impl Parse for MockSynDeriveFieldAttr {
 enum MockSynDeriveFieldAttrIter {
     ValueToValue,
     ValueToValueIndexed,
+}
+
+impl fmt::Debug for MockSynDeriveFieldAttrIter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ValueToValue => f.write_str("ValueToValue"),
+            Self::ValueToValueIndexed => f.write_str("ValueToValueIndexed"),
+        }
+    }
 }
 
 impl Parse for MockSynDeriveFieldAttrIter {
@@ -1133,7 +1186,7 @@ mod test {
             struct ItemEnum as MyItemEnum {
                 #[mo]
                 generics: MyGenerics,
-                #[mock_syn(iter)]
+                #[mock_syn(transform(iter))]
                 variants: Vec<MyVariant>,
             }
         "#;

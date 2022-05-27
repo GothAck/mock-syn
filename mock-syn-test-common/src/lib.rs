@@ -36,8 +36,7 @@ pub fn print_err(e: &Error, input: &str) {
                 let replacement: String = { start.column..end.column }.map(|_| '=').collect();
                 err_line.replace_range(start.column..end.column, &replacement);
             } else {
-                let replacement: String =
-                    { start.column..err_line.len() }.map(|_| '=').collect();
+                let replacement: String = { start.column..err_line.len() }.map(|_| '=').collect();
                 err_line.replace_range(start.column.., &replacement);
             }
             lines.push(err_line);
