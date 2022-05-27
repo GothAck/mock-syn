@@ -431,7 +431,7 @@ impl MockSynDeriveFieldNamed {
             )) => quote! {
                 value.into_iter()
                     .map(TryFrom::try_from)
-                    .collect::<Result<_>>()?
+                    .collect::<syn::Result<_>>()?
             },
             Some(MockSynDeriveFieldAttrTransform::Iter(
                 MockSynDeriveFieldAttrIter::ValueToValueIndexed,
@@ -439,7 +439,7 @@ impl MockSynDeriveFieldNamed {
                 value.into_iter()
                     .enumerate()
                     .map(TryFrom::try_from)
-                    .collect::<Result<_>>()?
+                    .collect::<syn::Result<_>>()?
             },
         })
     }
@@ -543,7 +543,7 @@ impl MockSynDeriveFieldUnnamed {
             )) => quote! {
                 value.into_iter()
                     .map(TryFrom::try_from)
-                    .collect::<Result<_>>()?
+                    .collect::<syn::Result<_>>()?
             },
             Some(MockSynDeriveFieldAttrTransform::Iter(
                 MockSynDeriveFieldAttrIter::ValueToValueIndexed,
@@ -551,7 +551,7 @@ impl MockSynDeriveFieldUnnamed {
                 value.into_iter()
                     .enumerate()
                     .map(TryFrom::try_from)
-                    .collect::<Result<_>>()?
+                    .collect::<syn::Result<_>>()?
             },
         })
     }
