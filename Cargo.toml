@@ -17,6 +17,6 @@ quote = "1.0"
 syn = { version = "1.0", features = ["full"] }
 
 [dev-dependencies]
-mock-syn-test-common = { version = "0.1.0", path = "mock-syn-test-common" }
+mock-syn-test-common = { path = "mock-syn-test-common" }
 
 [workspace]
