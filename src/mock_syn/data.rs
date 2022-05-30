@@ -1,9 +1,6 @@
 use std::fmt;
 
-use syn::{
-    punctuated::Punctuated,
-    token, Token,
-};
+use syn::{punctuated::Punctuated, token, Token};
 
 use super::*;
 
