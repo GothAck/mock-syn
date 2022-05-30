@@ -1,3 +1,5 @@
+mod attr;
+
 use std::fmt;
 
 use proc_macro2::{Ident, TokenStream};
@@ -9,9 +11,11 @@ use syn::{
 };
 
 use super::*;
+use self::attr::*;
 
 pub struct MockSynDeriveVariant {
     pub attrs: Vec<Attribute>,
+    pub attr: MockSynDeriveVariantAttr,
     pub ident: Ident,
     pub fields: MockSynDeriveFields,
     pub discriminant: Option<(Token![=], Expr)>,
@@ -32,22 +36,26 @@ impl MockSynDeriveVariant {
         enum_ident: &Ident,
         as_ident: &Ident,
     ) -> Result<TokenStream> {
-        let ident = &self.ident;
+        if self.attr.skip.is_some() {
+            Ok(quote! {})
+        } else {
+            let ident = &self.ident;
 
-        let fields_match = self.to_tokens_match_try_from_fields_match()?;
-        let fields_into = self.to_tokens_match_try_from_fields_into()?;
+            let fields_match = self.to_tokens_match_try_from_fields_match()?;
+            let fields_into = self.to_tokens_match_try_from_fields_into()?;
 
-        Ok(match &self.fields {
-            MockSynDeriveFields::Named(..) => quote! {
-                #enum_ident::#ident { #fields_match } => #as_ident::#ident { #fields_into },
-            },
-            MockSynDeriveFields::Unnamed(..) => quote! {
-                #enum_ident::#ident(#fields_match) => #as_ident::#ident(#fields_into),
-            },
-            MockSynDeriveFields::Unit => quote! {
-                #enum_ident::#ident => #as_ident::#ident,
-            },
-        })
+            Ok(match &self.fields {
+                MockSynDeriveFields::Named(..) => quote! {
+                    #enum_ident::#ident { #fields_match } => #as_ident::#ident { #fields_into },
+                },
+                MockSynDeriveFields::Unnamed(..) => quote! {
+                    #enum_ident::#ident(#fields_match) => #as_ident::#ident(#fields_into),
+                },
+                MockSynDeriveFields::Unit => quote! {
+                    #enum_ident::#ident => #as_ident::#ident,
+                },
+            })
+        }
     }
 
     fn to_tokens_match_try_from_fields_match(&self) -> Result<TokenStream> {
@@ -88,6 +96,14 @@ impl MockSynDeriveVariant {
 impl Parse for MockSynDeriveVariant {
     fn parse(input: ParseStream) -> Result<Self> {
         let attrs = input.call(Attribute::parse_outer)?;
+        let (our_attrs, attrs): (Vec<_>, Vec<_>) = attrs
+            .into_iter()
+            .partition(MockSynDeriveVariantAttr::is_match);
+        let attr = our_attrs
+            .into_iter()
+            .map(MockSynDeriveVariantAttr::try_from)
+            .collect::<Result<Vec<_>>>()
+            .and_then(MockSynDeriveVariantAttr::merge)?;
         let _visibility: Visibility = input.parse()?;
         let ident: Ident = input.parse()?;
         let fields = input.parse()?;
@@ -100,6 +116,7 @@ impl Parse for MockSynDeriveVariant {
         };
         Ok(Self {
             attrs,
+            attr,
             ident,
             fields,
             discriminant,
