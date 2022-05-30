@@ -15,10 +15,7 @@ pub struct MockSynDeriveVariantAttr {
 impl fmt::Debug for MockSynDeriveVariantAttr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MockSynDeriveVariantAttr")
-            .field(
-                "skip",
-                &self.skip,
-            )
+            .field("skip", &self.skip)
             .finish()
     }
 }
@@ -80,8 +77,6 @@ impl Parse for MockSynDeriveVariantAttr {
             }
         }
 
-        Ok(Self {
-            skip,
-        })
+        Ok(Self { skip })
     }
 }

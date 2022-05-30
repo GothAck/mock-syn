@@ -10,8 +10,8 @@ use syn::{
     token, Attribute, Error, Expr, Result, Token, Visibility,
 };
 
-use super::*;
 use self::attr::*;
+use super::*;
 
 pub struct MockSynDeriveVariant {
     pub attrs: Vec<Attribute>,

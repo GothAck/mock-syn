@@ -42,6 +42,8 @@ mock_syn! {
         Named(DFieldsNamed),
         Unnamed(DFieldsUnnamed),
         Unit,
+        #[mock_syn(skip)]
+        TestSkipped,
     }
 }
 
