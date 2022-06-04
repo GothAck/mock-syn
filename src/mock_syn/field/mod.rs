@@ -7,7 +7,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    token, Attribute, Error, Expr, Index, Result, Token, Type, Visibility,
+    token, Attribute, Error, Index, Result, Token, Type, Visibility,
 };
 
 use self::attr::*;
@@ -69,22 +69,15 @@ impl MockSynDeriveFieldNamed {
         let ident_localized = self.ident_localized();
 
         if let Some(skip) = self.attr.skip.as_ref() {
+            use MockSynDeriveFieldAttrSkip as Skip;
+            use MockSynDeriveFieldAttrSkipExpr as SkipExpr;
             let default = match skip {
-                Some(Some(Expr::Call(expr_call))) => quote! { #expr_call },
-                Some(Some(Expr::Path(expr_path))) => quote! { #expr_path() },
-                Some(Some(Expr::Lit(expr_lit))) => quote! { #expr_lit },
-                Some(Some(Expr::Struct(expr_struct))) => quote! { #expr_struct },
-                Some(Some(expr)) => {
-                    return Err(Error::new_spanned(
-                        expr,
-                        format!(
-                            "Invalid expression '{:?}'",
-                            ToTokens::into_token_stream(expr).to_string()
-                        ),
-                    ))
-                }
-                Some(None) => return Ok(quote! {}),
-                None => quote! { std::default::Default::default() },
+                Skip::Expr(SkipExpr::Call(expr_call)) => quote! { #expr_call },
+                Skip::Expr(SkipExpr::Path(expr_path)) => quote! { #expr_path() },
+                Skip::Expr(SkipExpr::Lit(expr_lit)) => quote! { #expr_lit },
+                Skip::Expr(SkipExpr::Struct(expr_struct)) => quote! { #expr_struct },
+                Skip::Nothing => quote! {},
+                Skip::StdDefault => quote! { std::default::Default::default() },
             };
 
             Ok(quote! {
@@ -212,21 +205,15 @@ impl MockSynDeriveFieldUnnamed {
         let ident_localized = self.ident_localized();
 
         if let Some(skip) = self.attr.skip.as_ref() {
+            use MockSynDeriveFieldAttrSkip as Skip;
+            use MockSynDeriveFieldAttrSkipExpr as SkipExpr;
             let default = match skip {
-                Some(Some(Expr::Call(expr_call))) => quote! { #expr_call },
-                Some(Some(Expr::Path(expr_path))) => quote! { #expr_path() },
-                Some(Some(Expr::Lit(expr_lit))) => quote! { #expr_lit },
-                Some(Some(expr)) => {
-                    return Err(Error::new_spanned(
-                        expr,
-                        format!(
-                            "Invalid expression '{:?}'",
-                            ToTokens::into_token_stream(expr).to_string()
-                        ),
-                    ))
-                }
-                Some(None) => return Ok(quote! {}),
-                None => quote! { std::default::Default::default() },
+                Skip::Expr(SkipExpr::Call(expr_call)) => quote! { #expr_call },
+                Skip::Expr(SkipExpr::Path(expr_path)) => quote! { #expr_path() },
+                Skip::Expr(SkipExpr::Lit(expr_lit)) => quote! { #expr_lit },
+                Skip::Expr(SkipExpr::Struct(expr_struct)) => quote! { #expr_struct },
+                Skip::Nothing => quote! {},
+                Skip::StdDefault => quote! { std::default::Default::default() },
             };
 
             Ok(quote! { { #default } })

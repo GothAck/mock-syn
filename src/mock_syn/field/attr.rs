@@ -3,7 +3,7 @@ use quote::{quote, ToTokens};
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
-    token, Attribute, Error, Expr, Result, Token,
+    token, Attribute, Error, Expr, ExprCall, ExprLit, ExprPath, ExprStruct, Result, Token,
 };
 
 use crate::common::syn::IdentIndex;
@@ -11,7 +11,7 @@ use crate::common::syn::IdentIndex;
 #[derive(Debug, Default)]
 pub struct MockSynDeriveFieldAttr {
     pub transform: Option<MockSynDeriveFieldAttrTransform>,
-    pub skip: Option<Option<Option<Expr>>>,
+    pub skip: Option<MockSynDeriveFieldAttrSkip>,
     pub source: Option<IdentIndex>,
 }
 
@@ -72,16 +72,7 @@ impl Parse for MockSynDeriveFieldAttr {
                     transform = Some(content.parse()?);
                 }
                 "skip" => {
-                    skip = Some(None);
-                    if input.peek(token::Paren) {
-                        let content;
-                        let _ = parenthesized!(content in input);
-                        if content.is_empty() {
-                            skip = Some(Some(None));
-                        } else {
-                            skip = Some(Some(Some(content.parse()?)));
-                        }
-                    }
+                    skip = Some(input.parse()?);
                 }
                 "source" => {
                     let content;
@@ -106,6 +97,50 @@ impl Parse for MockSynDeriveFieldAttr {
             skip,
             source,
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MockSynDeriveFieldAttrSkip {
+    StdDefault,
+    Nothing,
+    Expr(MockSynDeriveFieldAttrSkipExpr),
+}
+
+impl Parse for MockSynDeriveFieldAttrSkip {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.peek(token::Paren) {
+            let content;
+            let _ = parenthesized!(content in input);
+            if content.is_empty() {
+                Ok(Self::Nothing)
+            } else {
+                Ok(Self::Expr(content.parse()?))
+            }
+        } else {
+            Ok(Self::StdDefault)
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MockSynDeriveFieldAttrSkipExpr {
+    Call(ExprCall),
+    Path(ExprPath),
+    Lit(ExprLit),
+    Struct(ExprStruct),
+}
+
+impl Parse for MockSynDeriveFieldAttrSkipExpr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let expr: Expr = input.parse()?;
+        match expr {
+            Expr::Call(value) => Ok(Self::Call(value)),
+            Expr::Path(value) => Ok(Self::Path(value)),
+            Expr::Lit(value) => Ok(Self::Lit(value)),
+            Expr::Struct(value) => Ok(Self::Struct(value)),
+            _ => Err(Error::new_spanned(expr, "Invalid expression")),
+        }
     }
 }
 
