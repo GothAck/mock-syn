@@ -63,7 +63,7 @@ impl MockSynDeriveVariant {
             MockSynDeriveFields::Unnamed(_, fields) => {
                 let ids = fields
                     .iter()
-                    .map(|f| f.ident_index())
+                    .map(|f| f.ident_localized())
                     .collect::<Punctuated<_, token::Comma>>();
                 Ok(quote! { #ids })
             }

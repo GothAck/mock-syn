@@ -113,11 +113,10 @@ impl MockSynDerive {
                 .map(MockSynDeriveFieldNamed::to_tokens_value)
                 .collect::<Result<TokenStream>>()?;
 
-            let fields: TokenStream = fields_named
+            let fields = fields_named
                 .iter()
-                .map(|f| &f.ident)
-                .map(|ident| quote!( #ident, ))
-                .collect();
+                .map(MockSynDeriveFieldNamed::to_tokens_set)
+                .collect::<Result<TokenStream>>()?;
 
             Ok(Some(quote! {
                 impl #impl_generics TryFrom<#try_from_ty> for #as_ident #ty_generics #where_clause {

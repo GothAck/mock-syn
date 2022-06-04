@@ -3,19 +3,47 @@ mod attr;
 use std::fmt;
 
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote, IdentFragment, ToTokens};
 use syn::{
     braced, parenthesized,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
+    spanned::Spanned,
     token, Attribute, Error, Expr, Index, Result, Token, Type, Visibility,
 };
 
 use self::attr::*;
 
+pub trait MockSynDeriveFieldCommon {
+    type Ident: IdentFragment;
+    const PREFIX: &'static str = "__mock_syn";
+
+    fn localize_ident<I: IdentFragment + ToTokens>(ident: &I) -> Ident {
+        format_ident!("{}_{}", Self::PREFIX, ident, span = Spanned::span(ident))
+    }
+
+    fn localize_ident_additional<I: IdentFragment + ToTokens>(
+        ident: &I,
+        additional: &str,
+    ) -> Ident {
+        format_ident!(
+            "{}_{}_{}",
+            Self::PREFIX,
+            additional,
+            ident,
+            span = Spanned::span(ident)
+        )
+    }
+
+    fn attr_source(&self) -> &Self::Ident;
+    fn ident_localized(&self) -> Ident;
+    fn source_localized(&self) -> Ident;
+}
+
 pub struct MockSynDeriveFieldNamed {
     pub attrs: Vec<Attribute>,
     pub attr: MockSynDeriveFieldAttr,
+    pub attr_source: Option<Ident>,
     pub vis: Visibility,
     pub ident: Ident,
     pub colon_token: Token![:],
@@ -31,9 +59,25 @@ impl fmt::Debug for MockSynDeriveFieldNamed {
     }
 }
 
+impl MockSynDeriveFieldCommon for MockSynDeriveFieldNamed {
+    type Ident = Ident;
+
+    fn ident_localized(&self) -> Ident {
+        Self::localize_ident(&self.ident)
+    }
+
+    fn attr_source(&self) -> &Self::Ident {
+        self.attr_source.as_ref().unwrap_or(&self.ident)
+    }
+
+    fn source_localized(&self) -> Ident {
+        Self::localize_ident(self.attr_source())
+    }
+}
 impl MockSynDeriveFieldNamed {
     pub fn to_tokens_value(&self) -> Result<TokenStream> {
-        let ident = &self.ident;
+        let ident_localized = self.ident_localized();
+
         if let Some(skip) = self.attr.skip.as_ref() {
             let default = match skip {
                 Some(Some(Expr::Call(expr_call))) => quote! { #expr_call },
@@ -54,22 +98,31 @@ impl MockSynDeriveFieldNamed {
             };
 
             Ok(quote! {
-                let #ident = {
+                let #ident_localized = {
                     #default
                 };
             })
         } else {
-            let source = self.attr.source.as_ref().unwrap_or(ident);
+            let source = self.attr_source();
 
             let from = self.to_tokens_from()?;
 
             Ok(quote! {
-                let #ident = {
+                let #ident_localized = {
                     let value = &__wrapped.#source;
                     { #from }
                 };
             })
         }
+    }
+
+    pub fn to_tokens_set(&self) -> Result<TokenStream> {
+        let ident = &self.ident;
+        let ident_localized = &self.ident_localized();
+
+        Ok(quote! {
+            #ident: #ident_localized,
+        })
     }
 
     fn to_tokens_from(&self) -> Result<TokenStream> {
@@ -107,6 +160,7 @@ impl Parse for MockSynDeriveFieldNamed {
             .map(MockSynDeriveFieldAttr::try_from)
             .collect::<Result<Vec<_>>>()
             .and_then(MockSynDeriveFieldAttr::merge)?;
+        let attr_source = attr.source.as_ref().map(TryInto::try_into).transpose()?;
         let vis = input.parse()?;
         let ident = input.parse()?;
         let colon_token = input.parse()?;
@@ -115,6 +169,7 @@ impl Parse for MockSynDeriveFieldNamed {
         Ok(Self {
             attrs,
             attr,
+            attr_source,
             vis,
             ident,
             colon_token,
@@ -140,6 +195,7 @@ pub struct MockSynDeriveFieldUnnamed {
 
     pub attrs: Vec<Attribute>,
     pub attr: MockSynDeriveFieldAttr,
+    pub attr_source: Option<Index>,
     pub vis: Visibility,
     pub ty: Type,
 }
@@ -153,12 +209,26 @@ impl fmt::Debug for MockSynDeriveFieldUnnamed {
     }
 }
 
-impl MockSynDeriveFieldUnnamed {
-    pub fn ident_index(&self) -> Ident {
-        format_ident!("index_{}", self.index)
+impl MockSynDeriveFieldCommon for MockSynDeriveFieldUnnamed {
+    type Ident = Index;
+
+    fn ident_localized(&self) -> Ident {
+        Self::localize_ident(&self.index)
     }
+
+    fn attr_source(&self) -> &Self::Ident {
+        self.attr_source.as_ref().unwrap_or(&self.index)
+    }
+
+    fn source_localized(&self) -> Ident {
+        Self::localize_ident(self.attr_source())
+    }
+}
+
+impl MockSynDeriveFieldUnnamed {
     pub fn to_tokens_value(&self) -> Result<TokenStream> {
-        let ident_index = self.ident_index();
+        let ident_localized = self.ident_localized();
+
         if let Some(skip) = self.attr.skip.as_ref() {
             let default = match skip {
                 Some(Some(Expr::Call(expr_call))) => quote! { #expr_call },
@@ -181,7 +251,7 @@ impl MockSynDeriveFieldUnnamed {
         } else {
             let from = self.to_tokens_from()?;
 
-            Ok(quote! { { let value = #ident_index; { #from } } })
+            Ok(quote! { { let value = #ident_localized; { #from } } })
         }
     }
     fn to_tokens_from(&self) -> Result<TokenStream> {
@@ -223,6 +293,7 @@ impl MockSynDeriveFieldUnnamed {
             .map(MockSynDeriveFieldAttr::try_from)
             .collect::<Result<Vec<_>>>()
             .and_then(MockSynDeriveFieldAttr::merge)?;
+        let attr_source = attr.source.as_ref().map(TryInto::try_into).transpose()?;
         let vis = input.parse()?;
         let ty = input.parse()?;
 
@@ -230,6 +301,7 @@ impl MockSynDeriveFieldUnnamed {
             index,
             attrs,
             attr,
+            attr_source,
             vis,
             ty,
         })

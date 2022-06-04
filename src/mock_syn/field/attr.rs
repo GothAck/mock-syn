@@ -8,11 +8,13 @@ use syn::{
     token, Attribute, Error, Expr, Result, Token,
 };
 
+use crate::common::syn::IdentIndex;
+
 #[derive(Default)]
 pub struct MockSynDeriveFieldAttr {
     pub transform: Option<MockSynDeriveFieldAttrTransform>,
     pub skip: Option<Option<Option<Expr>>>,
-    pub source: Option<Ident>,
+    pub source: Option<IdentIndex>,
 }
 
 impl fmt::Debug for MockSynDeriveFieldAttr {

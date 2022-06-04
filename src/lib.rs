@@ -1,3 +1,4 @@
+mod common;
 mod mock_syn;
 
 use proc_macro::TokenStream;
