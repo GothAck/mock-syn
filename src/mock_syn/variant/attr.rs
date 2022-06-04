@@ -1,5 +1,3 @@
-use std::fmt;
-
 use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{
@@ -7,17 +5,9 @@ use syn::{
     Attribute, Error, Result, Token,
 };
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct MockSynDeriveVariantAttr {
     pub skip: Option<()>,
-}
-
-impl fmt::Debug for MockSynDeriveVariantAttr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockSynDeriveVariantAttr")
-            .field("skip", &self.skip)
-            .finish()
-    }
 }
 
 impl MockSynDeriveVariantAttr {

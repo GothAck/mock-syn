@@ -1,5 +1,3 @@
-use std::fmt;
-
 use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{
@@ -8,23 +6,12 @@ use syn::{
     Attribute, Error, Result, Token,
 };
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct MockSynDeriveAttr {
     pub try_from: Option<MockSynDeriveAttrTryFrom>,
     pub no_deref: Option<Nothing>,
     pub no_parse: Option<Nothing>,
     pub enum_todo: Option<Nothing>,
-}
-
-impl fmt::Debug for MockSynDeriveAttr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockSynDeriveAttr")
-            .field("try_from", &self.try_from)
-            .field("no_deref", &self.no_deref.is_some())
-            .field("no_parse", &self.no_parse.is_some())
-            .field("enum_todo", &self.enum_todo.is_some())
-            .finish()
-    }
 }
 
 impl MockSynDeriveAttr {
@@ -109,22 +96,10 @@ impl Parse for MockSynDeriveAttr {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum MockSynDeriveAttrTryFrom {
     Disable,
     Enable { indexed: Option<()> },
-}
-
-impl fmt::Debug for MockSynDeriveAttrTryFrom {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Disable => f.write_str("Disable"),
-            Self::Enable { indexed } => f
-                .debug_struct("Enable")
-                .field("indexed", &indexed.is_some())
-                .finish(),
-        }
-    }
 }
 
 impl Default for MockSynDeriveAttrTryFrom {

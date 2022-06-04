@@ -1,5 +1,3 @@
-use std::fmt;
-
 use proc_macro2::Ident;
 use quote::{quote, ToTokens};
 use syn::{
@@ -10,29 +8,11 @@ use syn::{
 
 use crate::common::syn::IdentIndex;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct MockSynDeriveFieldAttr {
     pub transform: Option<MockSynDeriveFieldAttrTransform>,
     pub skip: Option<Option<Option<Expr>>>,
     pub source: Option<IdentIndex>,
-}
-
-impl fmt::Debug for MockSynDeriveFieldAttr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockSynDeriveFieldAttr")
-            .field("transform", &self.transform)
-            .field(
-                "skip",
-                &self.skip.as_ref().map(|o| {
-                    o.as_ref()
-                        .map(ToTokens::into_token_stream)
-                        .as_ref()
-                        .map(ToString::to_string)
-                }),
-            )
-            .field("source", &self.source)
-            .finish()
-    }
 }
 
 impl MockSynDeriveFieldAttr {
@@ -129,23 +109,11 @@ impl Parse for MockSynDeriveFieldAttr {
     }
 }
 
+#[derive(Debug)]
 pub enum MockSynDeriveFieldAttrTransform {
     Clone,
     ValueMap(Box<Expr>),
     Iter(MockSynDeriveFieldAttrIter),
-}
-
-impl fmt::Debug for MockSynDeriveFieldAttrTransform {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Clone => f.write_str("Clone"),
-            Self::ValueMap(expr) => f
-                .debug_tuple("ValueMap")
-                .field(&expr.to_token_stream().to_string())
-                .finish(),
-            Self::Iter(iter) => f.debug_tuple("Iter").field(iter).finish(),
-        }
-    }
 }
 
 impl Parse for MockSynDeriveFieldAttrTransform {
@@ -177,18 +145,10 @@ impl Parse for MockSynDeriveFieldAttrTransform {
     }
 }
 
+#[derive(Debug)]
 pub enum MockSynDeriveFieldAttrIter {
     ValueToValue,
     ValueToValueIndexed,
-}
-
-impl fmt::Debug for MockSynDeriveFieldAttrIter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ValueToValue => f.write_str("ValueToValue"),
-            Self::ValueToValueIndexed => f.write_str("ValueToValueIndexed"),
-        }
-    }
 }
 
 impl Parse for MockSynDeriveFieldAttrIter {

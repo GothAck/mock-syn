@@ -3,8 +3,6 @@ mod data;
 mod field;
 mod variant;
 
-use std::fmt;
-
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{
@@ -19,6 +17,7 @@ use self::data::*;
 use self::field::*;
 use self::variant::*;
 
+#[derive(Debug)]
 pub struct MockSynDerive {
     attrs: Vec<Attribute>,
     attr: MockSynDeriveAttr,
@@ -30,16 +29,6 @@ pub struct MockSynDerive {
     generics: Generics,
 
     data: MockSynDeriveData,
-}
-
-impl fmt::Debug for MockSynDerive {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockSynDerive")
-            .field("attr", &self.attr)
-            .field("ident", &self.ident)
-            .field("data", &self.data)
-            .finish()
-    }
 }
 
 impl MockSynDerive {

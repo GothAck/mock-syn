@@ -1,7 +1,5 @@
 mod attr;
 
-use std::fmt;
-
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, IdentFragment, ToTokens};
 use syn::{
@@ -40,6 +38,7 @@ pub trait MockSynDeriveFieldCommon {
     fn source_localized(&self) -> Ident;
 }
 
+#[derive(Debug)]
 pub struct MockSynDeriveFieldNamed {
     pub attrs: Vec<Attribute>,
     pub attr: MockSynDeriveFieldAttr,
@@ -48,15 +47,6 @@ pub struct MockSynDeriveFieldNamed {
     pub ident: Ident,
     pub colon_token: Token![:],
     pub ty: Type,
-}
-
-impl fmt::Debug for MockSynDeriveFieldNamed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockSynDeriveFieldNamed")
-            .field("attr", &self.attr)
-            .field("ident", &self.ident)
-            .finish()
-    }
 }
 
 impl MockSynDeriveFieldCommon for MockSynDeriveFieldNamed {
@@ -190,6 +180,7 @@ impl ToTokens for MockSynDeriveFieldNamed {
     }
 }
 
+#[derive(Debug)]
 pub struct MockSynDeriveFieldUnnamed {
     pub index: Index,
 
@@ -198,15 +189,6 @@ pub struct MockSynDeriveFieldUnnamed {
     pub attr_source: Option<Index>,
     pub vis: Visibility,
     pub ty: Type,
-}
-
-impl fmt::Debug for MockSynDeriveFieldUnnamed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockSynDeriveFieldUnnamed")
-            .field("index", &self.index.index)
-            .field("attr", &self.attr)
-            .finish()
-    }
 }
 
 impl MockSynDeriveFieldCommon for MockSynDeriveFieldUnnamed {
@@ -318,6 +300,7 @@ impl ToTokens for MockSynDeriveFieldUnnamed {
     }
 }
 
+#[derive(Debug)]
 pub enum MockSynDeriveFields {
     Named(token::Brace, Punctuated<MockSynDeriveFieldNamed, Token![,]>),
     Unnamed(
@@ -325,22 +308,6 @@ pub enum MockSynDeriveFields {
         Punctuated<MockSynDeriveFieldUnnamed, Token![,]>,
     ),
     Unit,
-}
-
-impl fmt::Debug for MockSynDeriveFields {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Named(_, fields_named) => f
-                .debug_tuple("MockSynDeriveFields::Named")
-                .field(&fields_named.iter().collect::<Vec<_>>())
-                .finish(),
-            Self::Unnamed(_, fields_unnamed) => f
-                .debug_tuple("MockSynDeriveFields::Unnamed")
-                .field(&fields_unnamed.iter().collect::<Vec<_>>())
-                .finish(),
-            Self::Unit => f.write_str("MockSynDeriveFields::Unit"),
-        }
-    }
 }
 
 impl MockSynDeriveFields {

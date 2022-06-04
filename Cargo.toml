@@ -14,7 +14,7 @@ proc_macro = true
 [dependencies]
 proc-macro2 = "1.0"
 quote = "1.0"
-syn = { version = "1.0", features = ["full"] }
+syn = { version = "1.0", features = ["full", "extra-traits"] }
 
 [dev-dependencies]
 mock-syn-test-common = { path = "mock-syn-test-common" }

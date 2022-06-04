@@ -1,7 +1,5 @@
 mod attr;
 
-use std::fmt;
-
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::{
@@ -13,21 +11,13 @@ use syn::{
 use self::attr::*;
 use super::*;
 
+#[derive(Debug)]
 pub struct MockSynDeriveVariant {
     pub attrs: Vec<Attribute>,
     pub attr: MockSynDeriveVariantAttr,
     pub ident: Ident,
     pub fields: MockSynDeriveFields,
     pub discriminant: Option<(Token![=], Expr)>,
-}
-
-impl fmt::Debug for MockSynDeriveVariant {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockSynDeriveVariant")
-            .field("ident", &self.ident)
-            .field("fields", &self.fields)
-            .finish()
-    }
 }
 
 impl MockSynDeriveVariant {

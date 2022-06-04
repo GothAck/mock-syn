@@ -1,5 +1,3 @@
-use std::fmt;
-
 use proc_macro2::{Ident, TokenStream};
 use quote::{IdentFragment, ToTokens};
 use syn::{
@@ -7,7 +5,7 @@ use syn::{
     Error, Index, Result,
 };
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IdentIndex {
     Ident(Ident),
     Index(Index),
@@ -30,7 +28,7 @@ impl IdentIndex {
 }
 
 impl IdentFragment for IdentIndex {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Ident(v) => <Ident as IdentFragment>::fmt(v, f),
             Self::Index(v) => <Index as IdentFragment>::fmt(v, f),
@@ -74,12 +72,6 @@ impl PartialEq<u32> for IdentIndex {
             Self::Ident(..) => false,
             Self::Index(Index { index, .. }) => index == other,
         }
-    }
-}
-
-impl fmt::Debug for IdentIndex {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <Self as IdentFragment>::fmt(self, f)
     }
 }
 
