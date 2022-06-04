@@ -50,18 +50,20 @@ pub trait MockSynDeriveFieldCommon {
                 quote! {
                     let #ident_localized = {
                         let value = #attr_source_localized;
-                        { #from }
+
+                        #from
+
+                        value
                     };
                 }
             })
     }
 
     fn to_tokens_from(&self) -> TokenStream {
-        self.attr()
-            .transform
-            .as_ref()
-            .map(MockSynDeriveFieldAttrTransform::to_tokens_from)
-            .unwrap_or_else(|| quote! { TryFrom::try_from(value)? })
+        self.attr().transform.as_ref().map_or_else(
+            MockSynDeriveFieldAttrTransforms::to_tokens_from_default,
+            MockSynDeriveFieldAttrTransforms::to_tokens_from,
+        )
     }
 
     fn attr_source_or_ident(&self) -> &Self::Ident {

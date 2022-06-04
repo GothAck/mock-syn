@@ -3,6 +3,7 @@ use quote::{quote, ToTokens};
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
+    punctuated::Punctuated,
     token, Attribute, Error, Expr, ExprCall, ExprLit, ExprPath, ExprStruct, LitStr, Result, Token,
 };
 
@@ -10,7 +11,7 @@ use crate::common::syn::{IdentIndex, Parenthesized};
 
 #[derive(Debug, Default)]
 pub struct MockSynDeriveFieldAttr {
-    pub transform: Option<MockSynDeriveFieldAttrTransform>,
+    pub transform: Option<MockSynDeriveFieldAttrTransforms>,
     pub skip: Option<MockSynDeriveFieldAttrSkip>,
     pub source: Option<Parenthesized<IdentIndex>>,
 }
@@ -58,9 +59,7 @@ impl Parse for MockSynDeriveFieldAttr {
             let ident: Ident = input.parse()?;
             match ident.to_string().as_str() {
                 "transform" => {
-                    let content;
-                    let _ = parenthesized!(content in input);
-                    this.transform = Some(content.parse()?);
+                    this.transform = Some(input.parse()?);
                 }
                 "skip" => {
                     this.skip = Some(input.parse()?);
@@ -149,8 +148,54 @@ impl Parse for MockSynDeriveFieldAttrSkipExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+pub struct MockSynDeriveFieldAttrTransforms {
+    pub transforms: Punctuated<MockSynDeriveFieldAttrTransform, Token![,]>,
+}
+
+impl MockSynDeriveFieldAttrTransforms {
+    pub fn to_tokens_from(&self) -> TokenStream {
+        if self.transforms.is_empty() {
+            Self::default().to_tokens_from()
+        } else {
+            self.transforms
+                .iter()
+                .map(MockSynDeriveFieldAttrTransform::to_tokens_from)
+                .map(|t| quote! { let value = { #t }; })
+                .collect()
+        }
+    }
+
+    pub fn to_tokens_from_default() -> TokenStream {
+        Self::default().to_tokens_from()
+    }
+}
+
+impl Default for MockSynDeriveFieldAttrTransforms {
+    fn default() -> Self {
+        Self {
+            transforms: Punctuated::from_iter([MockSynDeriveFieldAttrTransform::TryFrom]),
+        }
+    }
+}
+
+impl Parse for MockSynDeriveFieldAttrTransforms {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        let _ = parenthesized!(content in input);
+        let transforms = content.parse_terminated(MockSynDeriveFieldAttrTransform::parse)?;
+
+        Ok(if transforms.is_empty() {
+            Self::default()
+        } else {
+            Self { transforms }
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum MockSynDeriveFieldAttrTransform {
+    TryFrom,
     Clone,
     ValueMap(Parenthesized<Box<Expr>>),
     OkOrElse(Parenthesized<LitStr>),
@@ -160,6 +205,7 @@ pub enum MockSynDeriveFieldAttrTransform {
 impl MockSynDeriveFieldAttrTransform {
     pub fn to_tokens_from(&self) -> TokenStream {
         match self {
+            Self::TryFrom => quote! { TryFrom::try_from(value)? },
             Self::Clone => quote! { value.clone() },
             Self::ValueMap(value_map) => quote! { #value_map },
             Self::OkOrElse(lit_str) => quote! {
@@ -180,6 +226,7 @@ impl Parse for MockSynDeriveFieldAttrTransform {
     fn parse(input: ParseStream) -> Result<Self> {
         let ident: Ident = input.parse()?;
         Ok(match ident.to_string().as_str() {
+            "try_from" => Self::TryFrom,
             "clone" => Self::Clone,
             "value_map" => Self::ValueMap(input.parse()?),
             "ok_or_else" => Self::OkOrElse(input.parse()?),
