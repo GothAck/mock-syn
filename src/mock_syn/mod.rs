@@ -97,15 +97,20 @@ impl MockSynDerive {
                 .map(|_| quote! { (index, value) })
                 .unwrap_or_else(|| quote! { value });
 
-            let fields_def = fields_named
+            let fields_get = fields_named
                 .iter()
-                .map(MockSynDeriveFieldNamed::to_tokens_value)
-                .collect::<Result<TokenStream>>()?;
+                .map(MockSynDeriveFieldNamed::to_tokens_get)
+                .collect::<TokenStream>();
 
-            let fields = fields_named
+            let fields_calc = fields_named
+                .iter()
+                .map(MockSynDeriveFieldNamed::to_tokens_calc)
+                .collect::<TokenStream>();
+
+            let fields_set = fields_named
                 .iter()
                 .map(MockSynDeriveFieldNamed::to_tokens_set)
-                .collect::<Result<TokenStream>>()?;
+                .collect::<TokenStream>();
 
             Ok(Some(quote! {
                 impl #impl_generics TryFrom<#try_from_ty> for #as_ident #ty_generics #where_clause {
@@ -113,11 +118,13 @@ impl MockSynDerive {
                     fn try_from(#try_from_pat: #try_from_ty) -> syn::Result<Self> {
                         let __wrapped = value.clone();
 
-                        #fields_def
+                        #fields_get
+
+                        #fields_calc
 
                         Ok(Self {
                             __wrapped,
-                            #fields
+                            #fields_set
                         })
                     }
                 }

@@ -4,8 +4,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::{
     parse::{Parse, ParseStream},
-    punctuated::Punctuated,
-    token, Attribute, Error, Expr, Result, Token, Visibility,
+    Attribute, Error, Expr, Result, Token, Visibility,
 };
 
 use self::attr::*;
@@ -31,15 +30,24 @@ impl MockSynDeriveVariant {
         } else {
             let ident = &self.ident;
 
-            let fields_match = self.to_tokens_match_try_from_fields_match()?;
-            let fields_into = self.to_tokens_match_try_from_fields_into()?;
+            let fields_get = self.to_tokens_match_try_from_fields_get()?;
+            let fields_calc = self.to_tokens_match_try_from_fields_calc()?;
+            let fields_set = self.to_tokens_match_try_from_fields_set()?;
 
             Ok(match &self.fields {
                 MockSynDeriveFields::Named(..) => quote! {
-                    #enum_ident::#ident { #fields_match } => #as_ident::#ident { #fields_into },
+                    #enum_ident::#ident { #fields_get } => {
+                        #fields_calc
+
+                        #as_ident::#ident { #fields_set }
+                    },
                 },
                 MockSynDeriveFields::Unnamed(..) => quote! {
-                    #enum_ident::#ident(#fields_match) => #as_ident::#ident(#fields_into),
+                    #enum_ident::#ident(#fields_get) => {
+                        #fields_calc
+
+                        #as_ident::#ident(#fields_set)
+                    },
                 },
                 MockSynDeriveFields::Unit => quote! {
                     #enum_ident::#ident => #as_ident::#ident,
@@ -48,15 +56,12 @@ impl MockSynDeriveVariant {
         }
     }
 
-    fn to_tokens_match_try_from_fields_match(&self) -> Result<TokenStream> {
+    fn to_tokens_match_try_from_fields_get(&self) -> Result<TokenStream> {
         match &self.fields {
-            MockSynDeriveFields::Unnamed(_, fields) => {
-                let ids = fields
-                    .iter()
-                    .map(|f| f.ident_localized())
-                    .collect::<Punctuated<_, token::Comma>>();
-                Ok(quote! { #ids })
-            }
+            MockSynDeriveFields::Unnamed(_, fields) => Ok(fields
+                .iter()
+                .map(MockSynDeriveFieldUnnamed::to_tokens_get)
+                .collect()),
             MockSynDeriveFields::Unit => Ok(quote! {}),
             MockSynDeriveFields::Named(..) => Err(Error::new_spanned(
                 &self.ident,
@@ -65,15 +70,26 @@ impl MockSynDeriveVariant {
         }
     }
 
-    fn to_tokens_match_try_from_fields_into(&self) -> Result<TokenStream> {
+    fn to_tokens_match_try_from_fields_calc(&self) -> Result<TokenStream> {
         match &self.fields {
-            MockSynDeriveFields::Unnamed(_, fields) => {
-                let into = fields
-                    .iter()
-                    .map(|f| f.to_tokens_value())
-                    .collect::<Result<Punctuated<_, token::Comma>>>()?;
-                Ok(quote! { #into })
-            }
+            MockSynDeriveFields::Unnamed(_, fields) => Ok(fields
+                .iter()
+                .map(MockSynDeriveFieldUnnamed::to_tokens_calc)
+                .collect()),
+            MockSynDeriveFields::Unit => Ok(quote! {}),
+            MockSynDeriveFields::Named(..) => Err(Error::new_spanned(
+                &self.ident,
+                "Named variants are not supported",
+            )),
+        }
+    }
+
+    fn to_tokens_match_try_from_fields_set(&self) -> Result<TokenStream> {
+        match &self.fields {
+            MockSynDeriveFields::Unnamed(_, fields) => Ok(fields
+                .iter()
+                .map(MockSynDeriveFieldUnnamed::to_tokens_set)
+                .collect()),
             MockSynDeriveFields::Unit => Ok(quote! {}),
             MockSynDeriveFields::Named(..) => Err(Error::new_spanned(
                 &self.ident,

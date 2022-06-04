@@ -13,8 +13,60 @@ use syn::{
 use self::attr::*;
 
 pub trait MockSynDeriveFieldCommon {
-    type Ident: IdentFragment;
+    type Ident: IdentFragment + ToTokens;
     const PREFIX: &'static str = "__mock_syn";
+
+    fn ident(&self) -> &Self::Ident;
+    fn ty(&self) -> &Type;
+    fn attr(&self) -> &MockSynDeriveFieldAttr;
+    fn attr_source(&self) -> Option<&Self::Ident>;
+
+    fn to_tokens_get(&self) -> TokenStream;
+    fn to_tokens_set(&self) -> TokenStream;
+
+    fn to_tokens_calc(&self) -> TokenStream {
+        let attr_source_localized = self.attr_source_localized();
+        let ident_localized = self.ident_localized();
+        let ty = self.ty();
+
+        self.attr()
+            .skip
+            .as_ref()
+            .map(MockSynDeriveFieldAttrSkip::to_tokens_default)
+            .map(|default| {
+                quote! {
+                    let #attr_source_localized: #ty = {
+                        #default
+                    };
+                    let #ident_localized: #ty = {
+                        #default
+                    };
+                }
+            })
+            .unwrap_or_else(|| {
+                let attr_source_localized = self.attr_source_localized();
+                let from = self.to_tokens_from();
+
+                quote! {
+                    let #ident_localized = {
+                        let value = #attr_source_localized;
+                        { #from }
+                    };
+                }
+            })
+    }
+
+    fn to_tokens_from(&self) -> TokenStream {
+        self.attr()
+            .transform
+            .as_ref()
+            .map(MockSynDeriveFieldAttrTransform::to_tokens_from)
+            .unwrap_or_else(|| quote! { TryFrom::try_from(value)? })
+    }
+
+    fn attr_source_or_ident(&self) -> &Self::Ident {
+        self.attr_source().unwrap_or_else(|| self.ident())
+    }
 
     fn localize_ident<I: IdentFragment + ToTokens>(ident: &I) -> Ident {
         format_ident!("{}_{}", Self::PREFIX, ident, span = Spanned::span(ident))
@@ -33,9 +85,33 @@ pub trait MockSynDeriveFieldCommon {
         )
     }
 
-    fn attr_source(&self) -> &Self::Ident;
-    fn ident_localized(&self) -> Ident;
-    fn source_localized(&self) -> Ident;
+    fn ident_localized(&self) -> Ident {
+        Self::localize_ident(self.ident())
+    }
+
+    fn attr_source_localized(&self) -> Ident {
+        Self::localize_ident(self.attr_source_or_ident())
+    }
+}
+
+macro_rules! common_impl {
+    ($self_ident:ident) => {
+        fn ident(&self) -> &Self::Ident {
+            &self.$self_ident
+        }
+
+        fn ty(&self) -> &Type {
+            &self.ty
+        }
+
+        fn attr(&self) -> &MockSynDeriveFieldAttr {
+            &self.attr
+        }
+
+        fn attr_source(&self) -> Option<&Self::Ident> {
+            self.attr_source.as_ref()
+        }
+    };
 }
 
 #[derive(Debug)]
@@ -52,60 +128,27 @@ pub struct MockSynDeriveFieldNamed {
 impl MockSynDeriveFieldCommon for MockSynDeriveFieldNamed {
     type Ident = Ident;
 
-    fn ident_localized(&self) -> Ident {
-        Self::localize_ident(&self.ident)
-    }
+    common_impl!(ident);
 
-    fn attr_source(&self) -> &Self::Ident {
-        self.attr_source.as_ref().unwrap_or(&self.ident)
-    }
-
-    fn source_localized(&self) -> Ident {
-        Self::localize_ident(self.attr_source())
-    }
-}
-impl MockSynDeriveFieldNamed {
-    pub fn to_tokens_value(&self) -> Result<TokenStream> {
-        let ident_localized = self.ident_localized();
-
-        if let Some(skip) = self.attr.skip.as_ref() {
-            let default = skip.to_tokens_default();
-
-            Ok(quote! {
-                let #ident_localized = {
-                    #default
-                };
-            })
+    fn to_tokens_get(&self) -> TokenStream {
+        if self.attr.skip.is_some() {
+            quote! {}
         } else {
-            let source = self.attr_source();
+            let attr_source_localized = self.attr_source_localized();
+            let source = self.attr_source_or_ident();
 
-            let from = self.to_tokens_from()?;
-
-            Ok(quote! {
-                let #ident_localized = {
-                    let value = &__wrapped.#source;
-                    { #from }
-                };
-            })
+            quote! {
+                let #attr_source_localized = &__wrapped.#source;
+            }
         }
     }
 
-    pub fn to_tokens_set(&self) -> Result<TokenStream> {
+    fn to_tokens_set(&self) -> TokenStream {
         let ident = &self.ident;
-        let ident_localized = &self.ident_localized();
-
-        Ok(quote! {
+        let ident_localized = self.ident_localized();
+        quote! {
             #ident: #ident_localized,
-        })
-    }
-
-    fn to_tokens_from(&self) -> Result<TokenStream> {
-        Ok(self
-            .attr
-            .transform
-            .as_ref()
-            .map(MockSynDeriveFieldAttrTransform::to_tokens_from)
-            .unwrap_or_else(|| quote! { TryFrom::try_from(value)? }))
+        }
     }
 }
 
@@ -164,40 +207,19 @@ pub struct MockSynDeriveFieldUnnamed {
 impl MockSynDeriveFieldCommon for MockSynDeriveFieldUnnamed {
     type Ident = Index;
 
-    fn ident_localized(&self) -> Ident {
-        Self::localize_ident(&self.index)
+    common_impl!(index);
+
+    fn to_tokens_get(&self) -> TokenStream {
+        let ident_localized = self.ident_localized();
+        quote! { #ident_localized, }
     }
 
-    fn attr_source(&self) -> &Self::Ident {
-        self.attr_source.as_ref().unwrap_or(&self.index)
-    }
-
-    fn source_localized(&self) -> Ident {
-        Self::localize_ident(self.attr_source())
-    }
-}
-
-impl MockSynDeriveFieldUnnamed {
-    pub fn to_tokens_value(&self) -> Result<TokenStream> {
+    fn to_tokens_set(&self) -> TokenStream {
         let ident_localized = self.ident_localized();
 
-        if let Some(skip) = self.attr.skip.as_ref() {
-            let default = skip.to_tokens_default();
-
-            Ok(quote! { { #default } })
-        } else {
-            let from = self.to_tokens_from()?;
-
-            Ok(quote! { { let value = #ident_localized; { #from } } })
+        quote! {
+            #ident_localized,
         }
-    }
-    fn to_tokens_from(&self) -> Result<TokenStream> {
-        Ok(self
-            .attr
-            .transform
-            .as_ref()
-            .map(MockSynDeriveFieldAttrTransform::to_tokens_from)
-            .unwrap_or_else(|| quote! { TryFrom::try_from(value)? }))
     }
 }
 
