@@ -59,9 +59,7 @@ impl Parse for MockSynDeriveAttr {
             let ident: Ident = input.parse()?;
             match ident.to_string().as_str() {
                 "try_from" => {
-                    let content;
-                    let _ = parenthesized!(content in input);
-                    ret.try_from = Some(content.parse()?);
+                    ret.try_from = Some(input.parse()?);
                 }
                 "no_deref" => {
                     ret.no_deref = Some(input.parse()?);
@@ -102,10 +100,13 @@ impl Default for MockSynDeriveAttrTryFrom {
 
 impl Parse for MockSynDeriveAttrTryFrom {
     fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        let _ = parenthesized!(content in input);
+
         let mut ret = Self::default();
 
-        while !input.is_empty() {
-            let ident: Ident = input.parse()?;
+        while !content.is_empty() {
+            let ident: Ident = content.parse()?;
             match ident.to_string().as_ref() {
                 "disable" => {
                     if let Self::Enable { .. } = ret {
@@ -127,8 +128,8 @@ impl Parse for MockSynDeriveAttrTryFrom {
                     ))
                 }
             }
-            if !input.is_empty() {
-                let _: Token![,] = input.parse()?;
+            if !content.is_empty() {
+                let _: Token![,] = content.parse()?;
             }
         }
 

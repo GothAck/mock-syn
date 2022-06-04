@@ -1,9 +1,83 @@
+use std::ops::Deref;
+
 use proc_macro2::{Ident, TokenStream};
 use quote::{IdentFragment, ToTokens};
 use syn::{
+    parenthesized,
     parse::{Parse, ParseStream},
     Error, Index, Result,
 };
+
+#[derive(Clone, Debug)]
+pub struct Parenthesized<T: Parse>(T);
+
+impl<T: Parse> Deref for Parenthesized<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: Parse> Parse for Parenthesized<T> {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        let _ = parenthesized!(content in input);
+        content.parse().map(Self)
+    }
+}
+
+impl<T: Parse + ToTokens> ToTokens for Parenthesized<T> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens);
+    }
+}
+
+macro_rules! parenthesized_try_into {
+    ($local:ty as $remote:ty) => {
+        impl From<$remote> for Parenthesized<$local>
+        where
+            $local: From<$remote>,
+        {
+            fn from(value: $remote) -> Parenthesized<$local> {
+                Parenthesized(From::from(value))
+            }
+        }
+
+        impl TryInto<$remote> for Parenthesized<$local>
+        where
+            $local: TryInto<$remote>,
+        {
+            type Error = <$local as TryInto<$remote>>::Error;
+
+            fn try_into(self) -> std::result::Result<$remote, Self::Error> {
+                self.0.try_into()
+            }
+        }
+
+        impl<'a> TryInto<$remote> for &'a Parenthesized<$local>
+        where
+            &'a $local: TryInto<$remote>,
+        {
+            type Error = <&'a $local as TryInto<$remote>>::Error;
+
+            fn try_into(self) -> std::result::Result<$remote, Self::Error> {
+                self.deref().try_into()
+            }
+        }
+
+        impl<'a> TryInto<&'a $remote> for &'a Parenthesized<$local>
+        where
+            &'a $local: TryInto<&'a $remote>,
+        {
+            type Error = <&'a $local as TryInto<&'a $remote>>::Error;
+
+            fn try_into(self) -> std::result::Result<&'a $remote, Self::Error> {
+                self.deref().try_into()
+            }
+        }
+    };
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IdentIndex {
@@ -111,3 +185,6 @@ macro_rules! convert {
 
 convert!(IdentIndex::as_ident as Ident);
 convert!(IdentIndex::as_index as Index);
+
+parenthesized_try_into!(IdentIndex as Ident);
+parenthesized_try_into!(IdentIndex as Index);

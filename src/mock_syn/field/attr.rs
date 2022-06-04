@@ -6,13 +6,13 @@ use syn::{
     token, Attribute, Error, Expr, ExprCall, ExprLit, ExprPath, ExprStruct, LitStr, Result, Token,
 };
 
-use crate::common::syn::IdentIndex;
+use crate::common::syn::{IdentIndex, Parenthesized};
 
 #[derive(Debug, Default)]
 pub struct MockSynDeriveFieldAttr {
     pub transform: Option<MockSynDeriveFieldAttrTransform>,
     pub skip: Option<MockSynDeriveFieldAttrSkip>,
-    pub source: Option<IdentIndex>,
+    pub source: Option<Parenthesized<IdentIndex>>,
 }
 
 impl MockSynDeriveFieldAttr {
@@ -66,9 +66,7 @@ impl Parse for MockSynDeriveFieldAttr {
                     this.skip = Some(input.parse()?);
                 }
                 "source" => {
-                    let content;
-                    let _ = parenthesized!(content in input);
-                    this.source = Some(content.parse()?);
+                    this.source = Some(input.parse()?);
                 }
                 unknown => {
                     return Err(Error::new_spanned(
@@ -154,8 +152,8 @@ impl Parse for MockSynDeriveFieldAttrSkipExpr {
 #[derive(Debug)]
 pub enum MockSynDeriveFieldAttrTransform {
     Clone,
-    ValueMap(Box<Expr>),
-    OkOrElse(LitStr),
+    ValueMap(Parenthesized<Box<Expr>>),
+    OkOrElse(Parenthesized<LitStr>),
     Iter(MockSynDeriveFieldAttrIter),
 }
 
@@ -183,25 +181,9 @@ impl Parse for MockSynDeriveFieldAttrTransform {
         let ident: Ident = input.parse()?;
         Ok(match ident.to_string().as_str() {
             "clone" => Self::Clone,
-            "value_map" => {
-                let content;
-                let _ = parenthesized!(content in input);
-                Self::ValueMap(content.parse()?)
-            }
-            "ok_or_else" => {
-                let content;
-                let _ = parenthesized!(content in input);
-                Self::OkOrElse(content.parse()?)
-            }
-            "iter" => {
-                if input.peek(token::Paren) {
-                    let content;
-                    let _ = parenthesized!(content in input);
-                    Self::Iter(content.parse()?)
-                } else {
-                    Self::Iter(MockSynDeriveFieldAttrIter::ValueToValue)
-                }
-            }
+            "value_map" => Self::ValueMap(input.parse()?),
+            "ok_or_else" => Self::OkOrElse(input.parse()?),
+            "iter" => Self::Iter(input.parse()?),
             unknown => {
                 return Err(Error::new_spanned(
                     ident,
@@ -212,7 +194,7 @@ impl Parse for MockSynDeriveFieldAttrTransform {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum MockSynDeriveFieldAttrIter {
     ValueToValue,
     ValueToValueIndexed,
@@ -238,29 +220,36 @@ impl MockSynDeriveFieldAttrIter {
 
 impl Parse for MockSynDeriveFieldAttrIter {
     fn parse(input: ParseStream) -> Result<Self> {
-        let first: Ident = input.parse()?;
-        let thin_arrow_token: Token![->] = input.parse()?;
-        let second: Ident = input.parse()?;
+        if input.peek(token::Paren) {
+            let content;
+            let _ = parenthesized!(content in input);
 
-        if first == "v" && second == "v" {
-            if !input.is_empty() {
-                let extension: Ident = input.parse()?;
-                if extension != "indexed" {
-                    let tokens = quote! { #first #thin_arrow_token #second #extension };
-                    return Err(Error::new_spanned(
-                        tokens,
-                        format!("Invalid iter value '{} -> {} {}'", first, second, extension),
-                    ));
+            let first: Ident = content.parse()?;
+            let thin_arrow_token: Token![->] = content.parse()?;
+            let second: Ident = content.parse()?;
+
+            if first == "v" && second == "v" {
+                if !content.is_empty() {
+                    let extension: Ident = content.parse()?;
+                    if extension != "indexed" {
+                        let tokens = quote! { #first #thin_arrow_token #second #extension };
+                        return Err(Error::new_spanned(
+                            tokens,
+                            format!("Invalid iter value '{} -> {} {}'", first, second, extension),
+                        ));
+                    }
+                    return Ok(Self::ValueToValueIndexed);
                 }
-                return Ok(Self::ValueToValueIndexed);
+                return Ok(Self::ValueToValue);
             }
-            return Ok(Self::ValueToValue);
-        }
 
-        let tokens = quote! { #first #thin_arrow_token #second };
-        Err(Error::new_spanned(
-            tokens,
-            format!("Invalid iter value '{} -> {}", first, second),
-        ))
+            let tokens = quote! { #first #thin_arrow_token #second };
+            Err(Error::new_spanned(
+                tokens,
+                format!("Invalid iter value '{} -> {}", first, second),
+            ))
+        } else {
+            Ok(Self::ValueToValue)
+        }
     }
 }
