@@ -24,18 +24,10 @@ impl MockSynDeriveAttr {
         let mut merged = iter.next().unwrap_or_default();
 
         for attr in iter {
-            if let Some(try_from) = attr.try_from {
-                merged.try_from.replace(try_from);
-            }
-            if let Some(no_deref) = attr.no_deref {
-                merged.no_deref.replace(no_deref);
-            }
-            if let Some(no_parse) = attr.no_parse {
-                merged.no_parse.replace(no_parse);
-            }
-            if let Some(enum_todo) = attr.enum_todo {
-                merged.enum_todo.replace(enum_todo);
-            }
+            merged.try_from = attr.try_from.or(merged.try_from);
+            merged.no_deref = attr.no_deref.or(merged.no_deref);
+            merged.no_parse = attr.no_parse.or(merged.no_parse);
+            merged.enum_todo = attr.enum_todo.or(merged.enum_todo);
         }
 
         Ok(merged)

@@ -25,15 +25,9 @@ impl MockSynDeriveFieldAttr {
         let mut merged = iter.next().unwrap_or_default();
 
         for attr in iter {
-            if let Some(transform) = attr.transform {
-                merged.transform.replace(transform);
-            }
-            if let Some(skip) = attr.skip {
-                merged.skip.replace(skip);
-            }
-            if let Some(source) = attr.source {
-                merged.source.replace(source);
-            }
+            merged.transform = attr.transform.or(merged.transform);
+            merged.skip = attr.skip.or(merged.skip);
+            merged.source = attr.source.or(merged.source);
         }
 
         Ok(merged)

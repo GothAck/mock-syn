@@ -20,9 +20,7 @@ impl MockSynDeriveVariantAttr {
         let mut merged = iter.next().unwrap_or_default();
 
         for attr in iter {
-            if let Some(skip) = attr.skip {
-                merged.skip.replace(skip);
-            }
+            merged.skip = attr.skip.or(merged.skip);
         }
 
         Ok(merged)
