@@ -58,10 +58,7 @@ impl TryFrom<Attribute> for MockSynDeriveFieldAttr {
 
 impl Parse for MockSynDeriveFieldAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut transform = None;
-        // let mut iter = None;
-        let mut skip = None;
-        let mut source = None;
+        let mut this = Self::default();
 
         while !input.is_empty() {
             let ident: Ident = input.parse()?;
@@ -69,15 +66,15 @@ impl Parse for MockSynDeriveFieldAttr {
                 "transform" => {
                     let content;
                     let _ = parenthesized!(content in input);
-                    transform = Some(content.parse()?);
+                    this.transform = Some(content.parse()?);
                 }
                 "skip" => {
-                    skip = Some(input.parse()?);
+                    this.skip = Some(input.parse()?);
                 }
                 "source" => {
                     let content;
                     let _ = parenthesized!(content in input);
-                    source = Some(content.parse()?);
+                    this.source = Some(content.parse()?);
                 }
                 unknown => {
                     return Err(Error::new_spanned(
@@ -91,12 +88,7 @@ impl Parse for MockSynDeriveFieldAttr {
             }
         }
 
-        Ok(Self {
-            transform,
-            // iter,
-            skip,
-            source,
-        })
+        Ok(this)
     }
 }
 
