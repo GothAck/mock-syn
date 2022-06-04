@@ -45,7 +45,7 @@ mock_syn! {
 mock_syn! {
     #[mock_syn(no_parse)]
     struct Field as MyFieldNamed {
-        #[mock_syn(transform(ok_or_else("ident is required")))]
+        #[mock_syn(transform(ok_or_error("ident is required")))]
         ident: Ident,
     }
 }

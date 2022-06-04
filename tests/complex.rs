@@ -64,7 +64,7 @@ mock_syn! {
 mock_syn! {
     #[mock_syn(no_parse)]
     pub struct Field as DFieldNamed {
-        #[mock_syn(transform(value_map(value.clone().ok_or_else(|| syn::Error::new_spanned(&__wrapped, "Fields should be named"))?)))]
+        #[mock_syn(transform(clone, ok_or_error("Fields should be named")))]
         pub ident: Ident,
     }
 }
@@ -74,13 +74,10 @@ mock_syn! {
     pub struct Field as DFieldUnnamed {
         #[mock_syn(skip(Index { index: index as u32, span: __wrapped.ty.span() }))]
         pub index: Index,
-        #[mock_syn(transform(value_map(if value.is_some() { return Err(syn::Error::new_spanned(&__wrapped, "Fields should not be named")) } else { NoIdent } )))]
-        pub ident: NoIdent,
+        #[mock_syn(transform(none_or_error("Fields should not be named")))]
+        pub ident: (),
     }
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NoIdent;
 
 #[test]
 fn test() {
@@ -128,17 +125,17 @@ fn test() {
         let field = &unnamed[0];
 
         assert_eq!(field.index.index, 0);
-        assert_eq!(field.ident, NoIdent);
+        assert_eq!(field.ident, ());
 
         let field = &unnamed[1];
 
         assert_eq!(field.index.index, 1);
-        assert_eq!(field.ident, NoIdent);
+        assert_eq!(field.ident, ());
 
         let field = &unnamed[2];
 
         assert_eq!(field.index.index, 2);
-        assert_eq!(field.ident, NoIdent);
+        assert_eq!(field.ident, ());
     }
 
     let variant = &input.data.variants[2];

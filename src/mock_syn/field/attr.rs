@@ -198,7 +198,8 @@ pub enum MockSynDeriveFieldAttrTransform {
     TryFrom,
     Clone,
     ValueMap(Parenthesized<Box<Expr>>),
-    OkOrElse(Parenthesized<LitStr>),
+    OkOrError(Parenthesized<LitStr>),
+    NoneOrError(Parenthesized<LitStr>),
     Iter(MockSynDeriveFieldAttrIter),
 }
 
@@ -208,14 +209,23 @@ impl MockSynDeriveFieldAttrTransform {
             Self::TryFrom => quote! { TryFrom::try_from(value)? },
             Self::Clone => quote! { value.clone() },
             Self::ValueMap(value_map) => quote! { #value_map },
-            Self::OkOrElse(lit_str) => quote! {
+            Self::OkOrError(error) => quote! {
                 value
                     .as_ref()
                     .ok_or_else(|| ::syn::Error::new(
                         ::syn::spanned::Spanned::span(&__wrapped),
-                        #lit_str
+                        #error
                     ))?
                     .clone()
+            },
+            Self::NoneOrError(error) => quote! {
+                value
+                    .as_ref()
+                    .map(|_| Err(::syn::Error::new(
+                        ::syn::spanned::Spanned::span(&__wrapped),
+                        #error,
+                    )))
+                    .unwrap_or_else(|| Ok(()))?
             },
             Self::Iter(iter) => iter.to_tokens_from(),
         }
@@ -229,7 +239,8 @@ impl Parse for MockSynDeriveFieldAttrTransform {
             "try_from" => Self::TryFrom,
             "clone" => Self::Clone,
             "value_map" => Self::ValueMap(input.parse()?),
-            "ok_or_else" => Self::OkOrElse(input.parse()?),
+            "ok_or_error" => Self::OkOrError(input.parse()?),
+            "none_or_error" => Self::NoneOrError(input.parse()?),
             "iter" => Self::Iter(input.parse()?),
             unknown => {
                 return Err(Error::new_spanned(
