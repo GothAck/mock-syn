@@ -1,4 +1,4 @@
-use proc_macro2::Ident;
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
     parenthesized,
@@ -99,6 +99,16 @@ pub enum MockSynDeriveFieldAttrSkip {
     Expr(MockSynDeriveFieldAttrSkipExpr),
 }
 
+impl MockSynDeriveFieldAttrSkip {
+    pub fn to_tokens_default(&self) -> Option<TokenStream> {
+        match self {
+            Self::StdDefault => Some(quote! { std::default::Default::default() }),
+            Self::Nothing => None,
+            Self::Expr(expr) => Some(expr.to_tokens_default()),
+        }
+    }
+}
+
 impl Parse for MockSynDeriveFieldAttrSkip {
     fn parse(input: ParseStream) -> Result<Self> {
         if input.peek(token::Paren) {
@@ -123,6 +133,17 @@ pub enum MockSynDeriveFieldAttrSkipExpr {
     Struct(ExprStruct),
 }
 
+impl MockSynDeriveFieldAttrSkipExpr {
+    pub fn to_tokens_default(&self) -> TokenStream {
+        match self {
+            Self::Call(expr) => quote! { #expr },
+            Self::Path(expr) => quote! { #expr() },
+            Self::Lit(expr) => quote! { #expr },
+            Self::Struct(expr) => quote! { #expr },
+        }
+    }
+}
+
 impl Parse for MockSynDeriveFieldAttrSkipExpr {
     fn parse(input: ParseStream) -> Result<Self> {
         let expr: Expr = input.parse()?;
@@ -142,6 +163,25 @@ pub enum MockSynDeriveFieldAttrTransform {
     ValueMap(Box<Expr>),
     OkOrElse(LitStr),
     Iter(MockSynDeriveFieldAttrIter),
+}
+
+impl MockSynDeriveFieldAttrTransform {
+    pub fn to_tokens_from(&self) -> TokenStream {
+        match self {
+            Self::Clone => quote! { value.clone() },
+            Self::ValueMap(value_map) => quote! { #value_map },
+            Self::OkOrElse(lit_str) => quote! {
+                value
+                    .as_ref()
+                    .ok_or_else(|| ::syn::Error::new(
+                        ::syn::spanned::Spanned::span(&__wrapped),
+                        #lit_str
+                    ))?
+                    .clone()
+            },
+            Self::Iter(iter) => iter.to_tokens_from(),
+        }
+    }
 }
 
 impl Parse for MockSynDeriveFieldAttrTransform {
@@ -182,6 +222,24 @@ impl Parse for MockSynDeriveFieldAttrTransform {
 pub enum MockSynDeriveFieldAttrIter {
     ValueToValue,
     ValueToValueIndexed,
+}
+
+impl MockSynDeriveFieldAttrIter {
+    pub fn to_tokens_from(&self) -> TokenStream {
+        match self {
+            Self::ValueToValue => quote! {
+                value.into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<syn::Result<_>>()?
+            },
+            Self::ValueToValueIndexed => quote! {
+                value.into_iter()
+                    .enumerate()
+                    .map(TryFrom::try_from)
+                    .collect::<syn::Result<_>>()?
+            },
+        }
+    }
 }
 
 impl Parse for MockSynDeriveFieldAttrIter {

@@ -69,16 +69,7 @@ impl MockSynDeriveFieldNamed {
         let ident_localized = self.ident_localized();
 
         if let Some(skip) = self.attr.skip.as_ref() {
-            use MockSynDeriveFieldAttrSkip as Skip;
-            use MockSynDeriveFieldAttrSkipExpr as SkipExpr;
-            let default = match skip {
-                Skip::Expr(SkipExpr::Call(expr_call)) => quote! { #expr_call },
-                Skip::Expr(SkipExpr::Path(expr_path)) => quote! { #expr_path() },
-                Skip::Expr(SkipExpr::Lit(expr_lit)) => quote! { #expr_lit },
-                Skip::Expr(SkipExpr::Struct(expr_struct)) => quote! { #expr_struct },
-                Skip::Nothing => quote! {},
-                Skip::StdDefault => quote! { std::default::Default::default() },
-            };
+            let default = skip.to_tokens_default();
 
             Ok(quote! {
                 let #ident_localized = {
@@ -109,35 +100,12 @@ impl MockSynDeriveFieldNamed {
     }
 
     fn to_tokens_from(&self) -> Result<TokenStream> {
-        Ok(match &self.attr.transform {
-            None => quote! { TryFrom::try_from(value)? },
-            Some(MockSynDeriveFieldAttrTransform::Clone) => quote! { value.clone() },
-            Some(MockSynDeriveFieldAttrTransform::ValueMap(value_map)) => quote! { #value_map },
-            Some(MockSynDeriveFieldAttrTransform::OkOrElse(error)) => quote! {
-                value
-                    .as_ref()
-                    .ok_or_else(|| ::syn::Error::new(
-                        ::syn::spanned::Spanned::span(&__wrapped),
-                        #error,
-                    ))?
-                    .clone()
-            },
-            Some(MockSynDeriveFieldAttrTransform::Iter(
-                MockSynDeriveFieldAttrIter::ValueToValue,
-            )) => quote! {
-                value.into_iter()
-                    .map(TryFrom::try_from)
-                    .collect::<syn::Result<_>>()?
-            },
-            Some(MockSynDeriveFieldAttrTransform::Iter(
-                MockSynDeriveFieldAttrIter::ValueToValueIndexed,
-            )) => quote! {
-                value.into_iter()
-                    .enumerate()
-                    .map(TryFrom::try_from)
-                    .collect::<syn::Result<_>>()?
-            },
-        })
+        Ok(self
+            .attr
+            .transform
+            .as_ref()
+            .map(MockSynDeriveFieldAttrTransform::to_tokens_from)
+            .unwrap_or_else(|| quote! { TryFrom::try_from(value)? }))
     }
 }
 
@@ -214,16 +182,7 @@ impl MockSynDeriveFieldUnnamed {
         let ident_localized = self.ident_localized();
 
         if let Some(skip) = self.attr.skip.as_ref() {
-            use MockSynDeriveFieldAttrSkip as Skip;
-            use MockSynDeriveFieldAttrSkipExpr as SkipExpr;
-            let default = match skip {
-                Skip::Expr(SkipExpr::Call(expr_call)) => quote! { #expr_call },
-                Skip::Expr(SkipExpr::Path(expr_path)) => quote! { #expr_path() },
-                Skip::Expr(SkipExpr::Lit(expr_lit)) => quote! { #expr_lit },
-                Skip::Expr(SkipExpr::Struct(expr_struct)) => quote! { #expr_struct },
-                Skip::Nothing => quote! {},
-                Skip::StdDefault => quote! { std::default::Default::default() },
-            };
+            let default = skip.to_tokens_default();
 
             Ok(quote! { { #default } })
         } else {
@@ -233,35 +192,12 @@ impl MockSynDeriveFieldUnnamed {
         }
     }
     fn to_tokens_from(&self) -> Result<TokenStream> {
-        Ok(match &self.attr.transform {
-            None => quote! { TryFrom::try_from(value)? },
-            Some(MockSynDeriveFieldAttrTransform::Clone) => quote! { value.clone() },
-            Some(MockSynDeriveFieldAttrTransform::ValueMap(value_map)) => quote! { #value_map },
-            Some(MockSynDeriveFieldAttrTransform::OkOrElse(error)) => quote! {
-                value
-                    .as_ref()
-                    .ok_or_else(|| ::syn::Error::new(
-                        ::syn::spanned::Spanned::span(&__wrapped),
-                        #error,
-                    ))?
-                    .clone()
-            },
-            Some(MockSynDeriveFieldAttrTransform::Iter(
-                MockSynDeriveFieldAttrIter::ValueToValue,
-            )) => quote! {
-                value.into_iter()
-                    .map(TryFrom::try_from)
-                    .collect::<syn::Result<_>>()?
-            },
-            Some(MockSynDeriveFieldAttrTransform::Iter(
-                MockSynDeriveFieldAttrIter::ValueToValueIndexed,
-            )) => quote! {
-                value.into_iter()
-                    .enumerate()
-                    .map(TryFrom::try_from)
-                    .collect::<syn::Result<_>>()?
-            },
-        })
+        Ok(self
+            .attr
+            .transform
+            .as_ref()
+            .map(MockSynDeriveFieldAttrTransform::to_tokens_from)
+            .unwrap_or_else(|| quote! { TryFrom::try_from(value)? }))
     }
 }
 
