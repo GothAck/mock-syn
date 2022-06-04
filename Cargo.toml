@@ -1,6 +1,6 @@
 [package]
 name = "mock-syn"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Greg \"GothAck\" Miell <greg@gothack.ninja>"]
 license = "MIT"
 description = "Mock / wrap syn structs and enums overiding specific fields"
