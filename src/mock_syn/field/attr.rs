@@ -3,7 +3,7 @@ use quote::{quote, ToTokens};
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
-    token, Attribute, Error, Expr, ExprCall, ExprLit, ExprPath, ExprStruct, Result, Token,
+    token, Attribute, Error, Expr, ExprCall, ExprLit, ExprPath, ExprStruct, LitStr, Result, Token,
 };
 
 use crate::common::syn::IdentIndex;
@@ -140,6 +140,7 @@ impl Parse for MockSynDeriveFieldAttrSkipExpr {
 pub enum MockSynDeriveFieldAttrTransform {
     Clone,
     ValueMap(Box<Expr>),
+    OkOrElse(LitStr),
     Iter(MockSynDeriveFieldAttrIter),
 }
 
@@ -152,6 +153,11 @@ impl Parse for MockSynDeriveFieldAttrTransform {
                 let content;
                 let _ = parenthesized!(content in input);
                 Self::ValueMap(content.parse()?)
+            }
+            "ok_or_else" => {
+                let content;
+                let _ = parenthesized!(content in input);
+                Self::OkOrElse(content.parse()?)
             }
             "iter" => {
                 if input.peek(token::Paren) {

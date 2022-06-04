@@ -113,6 +113,15 @@ impl MockSynDeriveFieldNamed {
             None => quote! { TryFrom::try_from(value)? },
             Some(MockSynDeriveFieldAttrTransform::Clone) => quote! { value.clone() },
             Some(MockSynDeriveFieldAttrTransform::ValueMap(value_map)) => quote! { #value_map },
+            Some(MockSynDeriveFieldAttrTransform::OkOrElse(error)) => quote! {
+                value
+                    .as_ref()
+                    .ok_or_else(|| ::syn::Error::new(
+                        ::syn::spanned::Spanned::span(&__wrapped),
+                        #error,
+                    ))?
+                    .clone()
+            },
             Some(MockSynDeriveFieldAttrTransform::Iter(
                 MockSynDeriveFieldAttrIter::ValueToValue,
             )) => quote! {
@@ -228,6 +237,15 @@ impl MockSynDeriveFieldUnnamed {
             None => quote! { TryFrom::try_from(value)? },
             Some(MockSynDeriveFieldAttrTransform::Clone) => quote! { value.clone() },
             Some(MockSynDeriveFieldAttrTransform::ValueMap(value_map)) => quote! { #value_map },
+            Some(MockSynDeriveFieldAttrTransform::OkOrElse(error)) => quote! {
+                value
+                    .as_ref()
+                    .ok_or_else(|| ::syn::Error::new(
+                        ::syn::spanned::Spanned::span(&__wrapped),
+                        #error,
+                    ))?
+                    .clone()
+            },
             Some(MockSynDeriveFieldAttrTransform::Iter(
                 MockSynDeriveFieldAttrIter::ValueToValue,
             )) => quote! {
