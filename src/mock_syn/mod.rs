@@ -38,12 +38,12 @@ impl MockSynDerive {
                 struct_token,
                 fields_named,
                 ..
-            } => self.to_tokens_struct(struct_token, fields_named),
+            } => Ok(self.to_tokens_struct(struct_token, fields_named)),
             MockSynDeriveData::Enum {
                 enum_token,
                 variants,
                 ..
-            } => self.to_tokens_enum(enum_token, variants),
+            } => self.try_to_tokens_enum(enum_token, variants),
         }
     }
 
@@ -51,7 +51,7 @@ impl MockSynDerive {
         &self,
         struct_token: &Token![struct],
         fields_named: &Punctuated<MockSynDeriveFieldNamed, Token![,]>,
-    ) -> Result<TokenStream> {
+    ) -> TokenStream {
         let MockSynDerive {
             attrs,
             vis,
@@ -61,11 +61,11 @@ impl MockSynDerive {
             ..
         } = self;
 
-        let tokens_struct_impl_try_from = self.to_tokens_struct_impl_try_from(fields_named)?;
-        let tokens_struct_impl_deref = self.to_tokens_struct_impl_deref()?;
-        let tokens_struct_impl_parse = self.to_tokens_struct_impl_parse()?;
+        let tokens_struct_impl_try_from = self.to_tokens_struct_impl_try_from(fields_named);
+        let tokens_struct_impl_deref = self.to_tokens_struct_impl_deref();
+        let tokens_struct_impl_parse = self.to_tokens_struct_impl_parse();
 
-        Ok(quote! {
+        quote! {
             #(#attrs)*
             #[derive(Clone)]
             #vis #struct_token #as_ident #generics {
@@ -75,13 +75,13 @@ impl MockSynDerive {
             #tokens_struct_impl_try_from
             #tokens_struct_impl_deref
             #tokens_struct_impl_parse
-        })
+        }
     }
 
     fn to_tokens_struct_impl_try_from(
         &self,
         fields_named: &Punctuated<MockSynDeriveFieldNamed, Token![,]>,
-    ) -> Result<Option<TokenStream>> {
+    ) -> Option<TokenStream> {
         if let MockSynDeriveAttrTryFrom::Enable { indexed } =
             self.attr.try_from.clone().unwrap_or_default()
         {
@@ -112,7 +112,7 @@ impl MockSynDerive {
                 .map(MockSynDeriveFieldNamed::to_tokens_set)
                 .collect::<TokenStream>();
 
-            Ok(Some(quote! {
+            Some(quote! {
                 impl #impl_generics TryFrom<#try_from_ty> for #as_ident #ty_generics #where_clause {
                     type Error = syn::Error;
                     fn try_from(#try_from_pat: #try_from_ty) -> syn::Result<Self> {
@@ -128,19 +128,19 @@ impl MockSynDerive {
                         })
                     }
                 }
-            }))
+            })
         } else {
-            Ok(None)
+            None
         }
     }
 
-    fn to_tokens_struct_impl_deref(&self) -> Result<Option<TokenStream>> {
+    fn to_tokens_struct_impl_deref(&self) -> Option<TokenStream> {
         if self.attr.no_deref.is_none() {
             let as_ident = &self.as_ident;
             let ident = &self.ident;
             let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
-            Ok(Some(quote! {
+            Some(quote! {
                 impl #impl_generics std::ops::Deref for #as_ident #ty_generics #where_clause {
                     type Target = #ident;
                     fn deref(&self) -> &Self::Target {
@@ -152,19 +152,19 @@ impl MockSynDerive {
                         &mut self.__wrapped
                     }
                 }
-            }))
+            })
         } else {
-            Ok(None)
+            None
         }
     }
 
-    fn to_tokens_struct_impl_parse(&self) -> Result<Option<TokenStream>> {
+    fn to_tokens_struct_impl_parse(&self) -> Option<TokenStream> {
         if self.attr.no_parse.is_none() {
             let as_ident = &self.as_ident;
             let ident = &self.ident;
             let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
-            Ok(Some(quote! {
+            Some(quote! {
                 impl #impl_generics syn::parse::Parse for #as_ident #ty_generics #where_clause {
                     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
                         let from: #ident = input.parse()?;
@@ -172,13 +172,13 @@ impl MockSynDerive {
                         Self::try_from(&from)
                     }
                 }
-            }))
+            })
         } else {
-            Ok(None)
+            None
         }
     }
 
-    fn to_tokens_enum(
+    fn try_to_tokens_enum(
         &self,
         enum_token: &Token![enum],
         variants: &Punctuated<MockSynDeriveVariant, Token![,]>,
@@ -191,9 +191,7 @@ impl MockSynDerive {
             ..
         } = self;
 
-        let tokens_enum_impl_try_from = self.to_tokens_enum_impl_try_from(variants)?;
-        // let tokens_enum_impl_deref = self.to_tokens_enum_impl_deref()?;
-        // let tokens_enum_impl_parse = self.to_tokens_enum_impl_parse()?;
+        let tokens_enum_impl_try_from = self.try_to_tokens_enum_impl_try_from(variants)?;
 
         Ok(quote! {
             #(#attrs)*
@@ -202,12 +200,10 @@ impl MockSynDerive {
                 #variants
             }
             #tokens_enum_impl_try_from
-            // #tokens_enum_impl_deref
-            // #tokens_enum_impl_parse
         })
     }
 
-    fn to_tokens_enum_impl_try_from(
+    fn try_to_tokens_enum_impl_try_from(
         &self,
         variants: &Punctuated<MockSynDeriveVariant, Token![,]>,
     ) -> Result<Option<TokenStream>> {
@@ -228,7 +224,7 @@ impl MockSynDerive {
 
             let variant_matches = variants
                 .iter()
-                .map(|v| v.to_tokens_match_try_from(ident, as_ident))
+                .map(|v| v.try_to_tokens_match_try_from(ident, as_ident))
                 .collect::<Result<TokenStream>>()?;
 
             let enum_todo = self.attr.enum_todo.as_ref().map(|_| {
@@ -236,17 +232,6 @@ impl MockSynDerive {
                     _ => todo!(),
                 }
             });
-
-            // let fields_def = fields_named
-            //     .iter()
-            //     .map(MockSynDeriveFieldNamed::to_tokens_value)
-            //     .collect::<Result<TokenStream>>()?;
-
-            // let fields: TokenStream = fields_named
-            //     .iter()
-            //     .map(|f| &f.ident)
-            //     .map(|ident| quote!( #ident, ))
-            //     .collect();
 
             Ok(Some(quote! {
                 impl #impl_generics TryFrom<#try_from_ty> for #as_ident #ty_generics #where_clause {

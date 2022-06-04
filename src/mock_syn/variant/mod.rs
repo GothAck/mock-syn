@@ -20,7 +20,7 @@ pub struct MockSynDeriveVariant {
 }
 
 impl MockSynDeriveVariant {
-    pub fn to_tokens_match_try_from(
+    pub fn try_to_tokens_match_try_from(
         &self,
         enum_ident: &Ident,
         as_ident: &Ident,
@@ -30,24 +30,22 @@ impl MockSynDeriveVariant {
         } else {
             let ident = &self.ident;
 
-            let fields_get = self.to_tokens_match_try_from_fields_get()?;
-            let fields_calc = self.to_tokens_match_try_from_fields_calc()?;
-            let fields_set = self.to_tokens_match_try_from_fields_set()?;
+            let fields_get = self.try_to_tokens_match_try_from_fields_get()?;
+            let fields_calc = self.try_to_tokens_match_try_from_fields_calc()?;
+            let fields_set = self.try_to_tokens_match_try_from_fields_set()?;
 
             Ok(match &self.fields {
                 MockSynDeriveFields::Named(..) => quote! {
                     #enum_ident::#ident { #fields_get } => {
                         #fields_calc
-
                         #as_ident::#ident { #fields_set }
-                    },
+                    }
                 },
                 MockSynDeriveFields::Unnamed(..) => quote! {
                     #enum_ident::#ident(#fields_get) => {
                         #fields_calc
-
                         #as_ident::#ident(#fields_set)
-                    },
+                    }
                 },
                 MockSynDeriveFields::Unit => quote! {
                     #enum_ident::#ident => #as_ident::#ident,
@@ -56,12 +54,11 @@ impl MockSynDeriveVariant {
         }
     }
 
-    fn to_tokens_match_try_from_fields_get(&self) -> Result<TokenStream> {
+    fn try_to_tokens_match_try_from_fields_get(&self) -> Result<TokenStream> {
         match &self.fields {
-            MockSynDeriveFields::Unnamed(_, fields) => Ok(fields
-                .iter()
-                .map(MockSynDeriveFieldUnnamed::to_tokens_get)
-                .collect()),
+            MockSynDeriveFields::Unnamed(_, fields) => {
+                Ok(fields.iter().map(|f| f.to_tokens_get()).collect())
+            }
             MockSynDeriveFields::Unit => Ok(quote! {}),
             MockSynDeriveFields::Named(..) => Err(Error::new_spanned(
                 &self.ident,
@@ -70,12 +67,11 @@ impl MockSynDeriveVariant {
         }
     }
 
-    fn to_tokens_match_try_from_fields_calc(&self) -> Result<TokenStream> {
+    fn try_to_tokens_match_try_from_fields_calc(&self) -> Result<TokenStream> {
         match &self.fields {
-            MockSynDeriveFields::Unnamed(_, fields) => Ok(fields
-                .iter()
-                .map(MockSynDeriveFieldUnnamed::to_tokens_calc)
-                .collect()),
+            MockSynDeriveFields::Unnamed(_, fields) => {
+                Ok(fields.iter().map(|f| f.to_tokens_calc()).collect())
+            }
             MockSynDeriveFields::Unit => Ok(quote! {}),
             MockSynDeriveFields::Named(..) => Err(Error::new_spanned(
                 &self.ident,
@@ -84,12 +80,11 @@ impl MockSynDeriveVariant {
         }
     }
 
-    fn to_tokens_match_try_from_fields_set(&self) -> Result<TokenStream> {
+    fn try_to_tokens_match_try_from_fields_set(&self) -> Result<TokenStream> {
         match &self.fields {
-            MockSynDeriveFields::Unnamed(_, fields) => Ok(fields
-                .iter()
-                .map(MockSynDeriveFieldUnnamed::to_tokens_set)
-                .collect()),
+            MockSynDeriveFields::Unnamed(_, fields) => {
+                Ok(fields.iter().map(|f| f.to_tokens_set()).collect())
+            }
             MockSynDeriveFields::Unit => Ok(quote! {}),
             MockSynDeriveFields::Named(..) => Err(Error::new_spanned(
                 &self.ident,
