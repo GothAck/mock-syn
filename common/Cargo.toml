@@ -1,0 +1,17 @@
+[package]
+name = "mock-syn-common"
+version = "0.1.4"
+authors = ["Greg \"GothAck\" Miell <greg@gothack.ninja>"]
+license = "MIT"
+description = "Common types for mock-syn: Mock / wrap syn structs and enums overiding specific fields"
+repository = "https://github.com/gothack/mock-syn"
+categories = ["development-tools::procedural-macro-helpers"]
+edition = "2021"
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "1.0", features = ["full", "extra-traits"] }
+
+[features]
+test = ["proc-macro2/span-locations"]

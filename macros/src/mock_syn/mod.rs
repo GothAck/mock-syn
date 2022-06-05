@@ -327,7 +327,7 @@ impl Parse for MockSynDerive {
 mod test {
     use syn::parse_str;
 
-    use mock_syn_test_common::*;
+    use mock_syn_common::test::*;
 
     use super::MockSynDerive;
 

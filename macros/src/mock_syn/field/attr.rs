@@ -7,7 +7,7 @@ use syn::{
     token, Attribute, Error, Expr, ExprCall, ExprLit, ExprPath, ExprStruct, LitStr, Result, Token,
 };
 
-use crate::common::syn::{IdentIndex, Parenthesized};
+use mock_syn_common::syn::{IdentIndex, Parenthesized};
 
 #[derive(Debug, Default)]
 pub struct MockSynDeriveFieldAttr {
