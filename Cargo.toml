@@ -8,15 +8,14 @@ repository = "https://github.com/gothack/mock-syn"
 categories = ["development-tools::procedural-macro-helpers"]
 edition = "2021"
 
-[lib]
-proc_macro = true
-
 [dependencies]
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = { version = "1.0", features = ["full", "extra-traits"] }
+mock-syn-common = { version = "0.1.4", path = "common" }
+mock-syn-derive = { version = "0.1.4", path = "derive" }
 
 [dev-dependencies]
-mock-syn-test-common = { path = "mock-syn-test-common" }
+proc-macro2 = "1.0"
+syn = { version = "1.0", features = ["parsing"] }
+
+mock-syn-common = { version = "0.1.4", path = "common", features = ["test"] }
 
 [workspace]
